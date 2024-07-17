@@ -26,8 +26,8 @@ class Card(models.Model):
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    brand = models.OneToOneField(to=Brand, on_delete=models.CASCADE)
-    limit = models.DecimalField(max_digits=10, decimal_places=2)
+    brand = models.OneToOneField(to=Brand, on_delete=models.SET_DEFAULT, default=None, null=True, blank=True)
+    limit = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     final_number = models.IntegerField()
     due_day = models.PositiveSmallIntegerField()
     expire_date = models.DateField()
@@ -37,8 +37,10 @@ class Card(models.Model):
         default=CREDIT,
     )
 
+    created_at = models.DateField(auto_now=True, editable=False)
+    updated_at = models.DateTimeField(auto_now=True)
     def __str__(self):
-        return f"Card {self.final_number} - {self.brand.title} - {self.get_card_type_display()}"
+        return f"Card {self.final_number} - {(self.brand.title if self.brand else 'unbranded')} - {self.get_card_type_display()}"
     
     def next_due_date(self):
         today = date.today()
