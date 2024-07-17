@@ -1,5 +1,5 @@
 from calendar import calendar
-from datetime import date
+from datetime import date, datetime
 from django.db import models
 import uuid
 
@@ -37,8 +37,8 @@ class Card(models.Model):
         default=CREDIT,
     )
 
-    created_at = models.DateField(auto_now=True, editable=False)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateField(default=datetime.now, editable=False)
+    updated_at = models.DateField(auto_now=True, editable=False)
     def __str__(self):
         return f"Card {self.final_number} - {(self.brand.title if self.brand else 'unbranded')} - {self.get_card_type_display()}"
     

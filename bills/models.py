@@ -1,9 +1,15 @@
 import uuid
-from django.utils.timezone import now
 from datetime import datetime
 from django.db import models
 
 # Create your models here.
+
+class Categories(models.Model):
+    id = models.AutoField(primary_key=True)
+    title = models.CharField(max_length=30)
+
+    def __str__(self) -> str:
+        return self.title
 
 class Bills(models.Model):
     
@@ -39,13 +45,15 @@ class Bills(models.Model):
         default=OPEN,
     )
     total_value = models.DecimalField(max_digits=10, decimal_places=2)
-    issue_date = models.DateField(default=datetime.now())
-    due_date = models.DateField(default=datetime.now())
+    issue_date = models.DateField()
+    due_date = models.DateField()
     payment_type = models.CharField(
         max_length=2,
         choices=PAYMENT_TYPE_CHOICES,
         default=MONEY,
     )
-    created_at = models.DateField(auto_now=True, editable=False)
-    updated_at = models.DateField(auto_now=True)
+    
+    category = models.OneToOneField(Categories, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateField(default=datetime.now, editable=False)
+    updated_at = models.DateField(auto_now=True, editable=False)
     
