@@ -80,4 +80,4 @@ class Payments(models.Model):
     )
 
     def __str__(self):
-        return f"Payment of {self.amount} - {self.payment_date}"
+        return f"Payment of {self.bill.category} - {self.bill.total_value}"
