@@ -14,25 +14,18 @@ class Categories(models.Model):
 
 
 class Bills(models.Model):
-    OPEN = "OP"
-    PEDDING = "PE"
-    PAID = "PA"
-    LATE = "LT"
-    CANCELED = "CL"
-
-    BILL_TYPE_CHOICES = [
-        (OPEN, "Open"),
-        (PEDDING, "Pedding"),
-        (PAID, "Paid"),
-        (LATE, "Late"),
-        (CANCELED, "Canceled"),
-    ]
+    class BillStatus(models.TextChoices):
+        OPEN = "OP", "Open"
+        PENDING = "PE", "Pending"
+        PAID = "PA", "Paid"
+        LATE = "LT", "Late"
+        CANCELED = "CL", "Canceled"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     status = models.CharField(
         max_length=2,
-        choices=BILL_TYPE_CHOICES,
-        default=OPEN,
+        choices=BillStatus,
+        default=BillStatus.OPEN,
     )
     total_value = models.DecimalField(max_digits=10, decimal_places=2)
     issue_date = models.DateField()
@@ -46,3 +39,7 @@ class Bills(models.Model):
 
     def __str__(self) -> str:
         return f"Bill: {self.category} - value: {self.total_value}"
+    
+    def paid_bill(self):
+        self.status = self.BillStatus.PAID
+        self.save()

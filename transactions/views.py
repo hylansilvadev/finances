@@ -1,14 +1,12 @@
 from rest_framework import viewsets
-
-from transactions.models import Payments, TransactionAccountToAccount, Transactions
-from transactions.serializers import (
-    PaymentsSerializer,
-    TransactionAccountToAccountSerializer,
+from .models import Transactions, TransactionAccountToAccount, Payments
+from .serializers import (
     TransactionsSerializer,
+    TransactionAccountToAccountSerializer,
+    PaymentsSerializer,
 )
 
 
-# Create your views here.
 class TransactionsViewSet(viewsets.ModelViewSet):
     queryset = Transactions.objects.all()
     serializer_class = TransactionsSerializer

@@ -6,12 +6,10 @@ from cards.models import Card
 
 
 class Transactions(models.Model):
-    WITHDRAW = "WD"
-    PIX = "PX"
-    TRANSACTION_TYPES = [
-        (WITHDRAW, "Withdraw"),
-        (PIX, "PIX"),
-    ]
+    class TransactionType(models.TextChoices):
+        WITHDRAW = "WD", "Withdraw"
+        DEPOSIT = "DP", "Deposit"
+        PIX = "PX", "PIX"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     account = models.ForeignKey(
@@ -19,7 +17,7 @@ class Transactions(models.Model):
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     transaction_type = models.CharField(
-        max_length=2, choices=TRANSACTION_TYPES, default=PIX
+        max_length=2, choices=TransactionType, default=TransactionType.DEPOSIT
     )
     timestamp = models.DateTimeField(auto_now_add=True)
 
@@ -30,14 +28,11 @@ class Transactions(models.Model):
 
 
 class TransactionAccountToAccount(models.Model):
-    DEPOSIT = "DP"
-    TED = "TD"
-    PIX = "PX"
-    TRANSACTION_TYPES = [
-        (DEPOSIT, "Deposit"),
-        (TED, "TED"),
-        (PIX, "PIX"),
-    ]
+    class TransactionType(models.TextChoices):
+        DEPOSIT = "DP", "Deposit"
+        TED = "TD", "TED"
+        PIX = "PX", "PIX"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     from_account = models.ForeignKey(
         Account, related_name="transfers_out", on_delete=models.CASCADE
@@ -47,7 +42,7 @@ class TransactionAccountToAccount(models.Model):
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     transaction_type = models.CharField(
-        max_length=2, choices=TRANSACTION_TYPES, default=PIX
+        max_length=2, choices=TransactionType, default=TransactionType.PIX
     )
     timestamp = models.DateTimeField(auto_now_add=True)
 
@@ -56,18 +51,12 @@ class TransactionAccountToAccount(models.Model):
 
 
 class Payments(models.Model):
-    MONEY = "MO"
-    TED = "TD"
-    PIX = "PX"
-    CREDIT = "CD"
-    DEBIT = "DB"
-    TRANSACTION_TYPES = [
-        (MONEY, "Money"),
-        (TED, "Ted"),
-        (PIX, "Pix"),
-        (CREDIT, "Credit"),
-        (DEBIT, "Debit"),
-    ]
+    class TransactionType(models.TextChoices):
+        MONEY = "MO", "Money"
+        TED = "TD", "Ted"
+        PIX = "PX", "Pix"
+        CREDIT = "CD", "Credit"
+        DEBIT = "DB", "Debit"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     account = models.ForeignKey(
@@ -76,8 +65,8 @@ class Payments(models.Model):
     card = models.ForeignKey(Card, on_delete=models.SET_NULL, null=True, blank=True)
     bill = models.ForeignKey(Bills, on_delete=models.SET_NULL, null=True, blank=True)
     transaction_type = models.CharField(
-        max_length=2, choices=TRANSACTION_TYPES, default=PIX
+        max_length=2, choices=TransactionType, default=TransactionType.MONEY
     )
 
     def __str__(self):
-        return f"Payment of {self.bill.category} - {self.bill.total_value}"
+        return f"Payment of {(self.bill.category if self.bill.category else 'uncategorized')} - {(self.bill.total_value if self.bill.total_value else 'unvaluated')}"
