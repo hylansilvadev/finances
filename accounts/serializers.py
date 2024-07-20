@@ -16,7 +16,7 @@ class AccountSerializer(serializers.HyperlinkedModelSerializer):
             "id",
             "bank",
             "bank_name",
-            "amount",
+            "balance",
             "card",
             "account_type",
             "account_type_display",

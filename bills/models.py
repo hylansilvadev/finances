@@ -34,11 +34,11 @@ class Bills(models.Model):
     category = models.OneToOneField(
         Categories, on_delete=models.SET_NULL, null=True, blank=True
     )
-    created_at = models.DateField(default=datetime.now, editable=False)
+    created_at = models.DateField(auto_now_add=True, editable=False)
     updated_at = models.DateField(auto_now=True, editable=False)
 
     def __str__(self) -> str:
-        return f"Bill: {self.category} - value: {self.total_value}"
+        return f"Bill: {(self.category if self.category else 'uncategorized')} - value: {self.total_value}"
     
     def paid_bill(self):
         self.status = self.BillStatus.PAID
