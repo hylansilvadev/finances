@@ -1,25 +1,20 @@
 from rest_framework import serializers
 
-from .models import Categories, Bills
+from .models import Categories, Bills, CreditCardBill
 
 
 class CategoriesSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Categories
-        fields = ["url", "id", "title"]
+        fields = '__all__'
 
 
 class BillsSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Bills
-        fields = [
-            "url",
-            "id",
-            "status",
-            "total_value",
-            "issue_date",
-            "due_date",
-            "category",
-            "created_at",
-            "updated_at",
-        ]
+        fields = '__all__'
+
+class CreditCardBillSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CreditCardBill
+        fields = '__all__'

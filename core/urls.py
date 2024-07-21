@@ -21,5 +21,5 @@ from .api import urlpatterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('',include(urlpatterns))
+    path('',include(urlpatterns)),
 ]

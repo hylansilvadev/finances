@@ -1,27 +1,19 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from decimal import Decimal
 
-from bills.models import Bills
 from .models import Transactions, TransactionAccountToAccount, Payments
 from .serializers import (
     TransactionsSerializer,
     TransactionAccountToAccountSerializer,
     PaymentsSerializer,
 )
-from accounts.models import Account
-import re
-from uuid import UUID
-
-
-def extract_uuid(url):
-    try:
-        uuid_str = re.search(
-            r"[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}", url
-        ).group(0)
-        return UUID(uuid_str)
-    except (AttributeError, ValueError):
-        raise ValueError(f'O valor "{url}" não é um UUID válido')
+from .utils import (
+    get_account,
+    get_amount,
+    get_bill,
+    get_card,
+    validate_transaction,
+)
 
 
 class PaymentsViewSet(viewsets.ModelViewSet):
@@ -29,25 +21,36 @@ class PaymentsViewSet(viewsets.ModelViewSet):
     serializer_class = PaymentsSerializer
 
     def create(self, request, *args, **kwargs):
-        if "account" not in request.data:
+        account = card = bill = None
+        if "account" in request.data:
+            account = get_account(request.data["account"])
+        if "card" in request.data:
+            card = get_card(request.data["card"])
+        if "bill" in request.data:
+            bill = get_bill(request.data["bill"])
+        else:
             return Response(
-                {"error": "Account field is required"},
+                {"error": "Bill is required for this transaction"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        account_uuid = extract_uuid(request.data["account"])
-        account = Account.objects.get(pk=account_uuid)
-
-        if "bill" in request.data:
-            bill = Bills.objects.get(pk=extract_uuid(request.data["bill"]))
-            amount = bill.total_value if bill.total_value else 0
-        else:
-            amount = 0
-
-        if account.balance < amount:
+        transaction_type = request.data["transaction_type"]
+        is_valid, error_message = validate_transaction(
+            account, card, bill, transaction_type
+        )
+        if not is_valid:
             return Response(
-                {"error": "Insufficient balance"}, status=status.HTTP_400_BAD_REQUEST
+                {"error": error_message}, status=status.HTTP_400_BAD_REQUEST
             )
+
+        if transaction_type == Payments.TransactionType.CREDIT:
+            card.pay_with_credit(bill.total_value)
+        elif transaction_type in [
+            Payments.TransactionType.DEBIT,
+            Payments.TransactionType.PIX,
+            Payments.TransactionType.TED,
+        ]:
+            account.withdraw(bill.total_value)
 
         return super().create(request, *args, **kwargs)
 
@@ -58,11 +61,10 @@ class PaymentsViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        account_uuid = extract_uuid(request.data["account"])
-        account = Account.objects.get(pk=account_uuid)
-
+        account = get_account(request.data["account"])
+        bill = None
         if "bill" in request.data:
-            bill = Bills.objects.get(pk=extract_uuid(request.data["bill"]))
+            bill = get_bill(request.data["bill"])
             amount = bill.total_value if bill.total_value else 0
         else:
             amount = 0
@@ -79,127 +81,81 @@ class TransactionsViewSet(viewsets.ModelViewSet):
     queryset = Transactions.objects.all()
     serializer_class = TransactionsSerializer
 
+    def handle_transaction(self, account, amount, transaction_type):
+        if transaction_type == Transactions.TransactionType.DEPOSIT:
+            account.deposit(amount)
+        else:
+            if not account.withdraw(amount):
+                raise ValueError("Insufficient balance")
+
     def create(self, request, *args, **kwargs):
-        if (
-            "account" not in request.data
-            or "amount" not in request.data
-            or "transaction_type" not in request.data
+        if not all(
+            key in request.data for key in ["account", "amount", "transaction_type"]
         ):
             return Response(
                 {"error": "Account, amount, and transaction_type fields are required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        account_uuid = extract_uuid(request.data["account"])
-        account = Account.objects.get(pk=account_uuid)
-        amount = Decimal(request.data["amount"])
+        account = get_account(request.data["account"])
+        amount = get_amount(request.data["amount"])
         transaction_type = request.data["transaction_type"]
 
-        if transaction_type == Transactions.TransactionType.DEPOSIT:
-            account.deposit(amount)
-        else:
-            if not account.withdraw(amount):
-                return Response(
-                    {"error": "Insufficient balance"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+        try:
+            self.handle_transaction(account, amount, transaction_type)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        response = super().create(request, *args, **kwargs)
-        return response
+        return super().create(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
-        if (
-            "account" not in request.data
-            or "amount" not in request.data
-            or "transaction_type" not in request.data
+        if not all(
+            key in request.data for key in ["account", "amount", "transaction_type"]
         ):
             return Response(
                 {"error": "Account, amount, and transaction_type fields are required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        account_uuid = extract_uuid(request.data["account"])
-        account = Account.objects.get(pk=account_uuid)
-        amount = Decimal(request.data["amount"])
+        account = get_account(request.data["account"])
+        amount = get_amount(request.data["amount"])
         transaction_type = request.data["transaction_type"]
 
-        if transaction_type == Transactions.TransactionType.DEPOSIT:
-            account.deposit(amount)
-        else:
-            if not account.withdraw(amount):
-                return Response(
-                    {"error": "Insufficient balance"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+        try:
+            self.handle_transaction(account, amount, transaction_type)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        response = super().update(request, *args, **kwargs)
-        return response
+        return super().update(request, *args, **kwargs)
 
 
 class TransactionAccountToAccountViewSet(viewsets.ModelViewSet):
+    http_method_names = ["get", "post", "delete"]
     queryset = TransactionAccountToAccount.objects.all()
     serializer_class = TransactionAccountToAccountSerializer
 
+    def handle_transfer(self, from_account, to_account, amount):
+        if not from_account.withdraw(amount):
+            raise ValueError("Insufficient balance in the from_account")
+        to_account.deposit(amount)
+        to_account.save()
+
     def create(self, request, *args, **kwargs):
-        if (
-            "from_account" not in request.data
-            or "to_account" not in request.data
-            or "amount" not in request.data
+        if not all(
+            key in request.data for key in ["from_account", "to_account", "amount"]
         ):
             return Response(
                 {"error": "From_account, to_account, and amount fields are required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        from_account_uuid = extract_uuid(request.data["from_account"])
-        to_account_uuid = extract_uuid(request.data["to_account"])
+        from_account = get_account(request.data["from_account"])
+        to_account = get_account(request.data["to_account"])
+        amount = get_amount(request.data["amount"])
 
-        from_account = Account.objects.get(pk=from_account_uuid)
-        to_account = Account.objects.get(pk=to_account_uuid)
+        try:
+            self.handle_transfer(from_account, to_account, amount)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        amount_str = request.data["amount"].replace(",", ".")
-        amount = Decimal(amount_str)
-
-        if not from_account.withdraw(amount):
-            return Response(
-                {"error": "Insufficient balance in the from_account"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        to_account.deposit(amount)
-        to_account.save()  # Ensure to save the updated balance of the to_account
-
-        response = super().create(request, *args, **kwargs)
-        return response
-
-    def update(self, request, *args, **kwargs):
-        if (
-            "from_account" not in request.data
-            or "to_account" not in request.data
-            or "amount" not in request.data
-        ):
-            return Response(
-                {"error": "From_account, to_account, and amount fields are required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        from_account_uuid = extract_uuid(request.data["from_account"])
-        to_account_uuid = extract_uuid(request.data["to_account"])
-
-        from_account = Account.objects.get(pk=from_account_uuid)
-        to_account = Account.objects.get(pk=to_account_uuid)
-
-        amount_str = request.data["amount"].replace(",", ".")
-        amount = Decimal(amount_str)
-
-        if not from_account.withdraw(amount):
-            return Response(
-                {"error": "Insufficient balance in the from_account"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        to_account.deposit(amount)
-        to_account.save()  # Ensure to save the updated balance of the to_account
-
-        response = super().update(request, *args, **kwargs)
-        return response
+        return super().create(request, *args, **kwargs)
