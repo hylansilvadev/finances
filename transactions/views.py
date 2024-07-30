@@ -10,9 +10,8 @@ from .serializers import (
 from .utils import (
     get_account,
     get_amount,
-    get_bill,
-    get_card,
-    validate_transaction,
+    process_transaction,
+    validate_request_data,
 )
 
 
@@ -21,58 +20,20 @@ class PaymentsViewSet(viewsets.ModelViewSet):
     serializer_class = PaymentsSerializer
 
     def create(self, request, *args, **kwargs):
-        account = card = bill = None
-        if "account" in request.data:
-            account = get_account(request.data["account"])
-        if "card" in request.data:
-            card = get_card(request.data["card"])
-        if "bill" in request.data:
-            bill = get_bill(request.data["bill"])
-        else:
-            return Response(
-                {"error": "Bill is required for this transaction"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        transaction_type = request.data["transaction_type"]
-        is_valid, error_message = validate_transaction(
-            account, card, bill, transaction_type
-        )
-        if not is_valid:
-            return Response(
-                {"error": error_message}, status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if transaction_type == Payments.TransactionType.CREDIT:
-            card.pay_with_credit(bill.total_value)
-        elif transaction_type in [
-            Payments.TransactionType.DEBIT,
-            Payments.TransactionType.PIX,
-            Payments.TransactionType.TED,
-        ]:
-            account.withdraw(bill.total_value)
+        try:
+            validate_request_data(request.data, ["bill", "transaction_type"])
+            account, card, bill, amount = process_transaction(request.data)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         return super().create(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
-        if "account" not in request.data:
-            return Response(
-                {"error": "Account field is required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        account = get_account(request.data["account"])
-        bill = None
-        if "bill" in request.data:
-            bill = get_bill(request.data["bill"])
-            amount = bill.total_value if bill.total_value else 0
-        else:
-            amount = 0
-
-        if account.balance < amount:
-            return Response(
-                {"error": "Insufficient balance"}, status=status.HTTP_400_BAD_REQUEST
-            )
+        try:
+            validate_request_data(request.data, ["bill", "transaction_type"])
+            account, card, bill, amount = process_transaction(request.data)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         return super().update(request, *args, **kwargs)
 

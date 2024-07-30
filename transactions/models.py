@@ -1,7 +1,7 @@
 import uuid
 from django.db import models
 from accounts.models import Account
-from bills.models import Bills, CreditCardBill
+from bills.models import Bills
 from cards.models import Card
 
 
@@ -55,8 +55,8 @@ class Payments(models.Model):
         MONEY = "MO", "Money"
         TED = "TD", "Ted"
         PIX = "PX", "Pix"
-        CREDIT = "CD", "Credit"
-        DEBIT = "DB", "Debit"
+        CREDIT = "CR", "Credit"
+        DEBIT = "DE", "Debit"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     account = models.ForeignKey(
@@ -65,13 +65,6 @@ class Payments(models.Model):
     card = models.ForeignKey(
         Card,
         on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-    )
-    credit_card_bill = models.ForeignKey(
-        CreditCardBill,
-        related_name="payments",
-        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )

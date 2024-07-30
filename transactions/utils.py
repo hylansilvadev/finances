@@ -53,3 +53,39 @@ def validate_transaction(account, card, bill, transaction_type):
 
 def get_amount(amount_str):
     return Decimal(amount_str.replace(",", "."))
+
+
+def validate_request_data(data, required_fields):
+    missing_fields = [field for field in required_fields if not data.get(field)]
+    if missing_fields:
+        raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
+
+def process_transaction(request_data):
+    bill = get_bill(request_data["bill"])
+    transaction_type = request_data.get("transaction_type")
+    amount = bill.total_value if bill else Decimal("0.00")
+
+    account = card = None
+
+    if transaction_type == Payments.TransactionType.CREDIT:
+        if "card" not in request_data:
+            raise ValueError("Card is required for credit transactions")
+        card = get_card(request_data["card"])
+        if amount > card.available_limit:
+            raise ValueError("Insufficient credit card limit")
+        card.pay_with_credit(amount)
+
+    elif transaction_type in [Payments.TransactionType.DEBIT, Payments.TransactionType.PIX, Payments.TransactionType.TED]:
+        if "account" not in request_data:
+            raise ValueError("Account is required for this transaction")
+        account = get_account(request_data["account"])
+        if amount > account.balance:
+            raise ValueError("Insufficient account balance")
+        account.withdraw(amount)
+
+    # Validar a transação
+    is_valid, error_message = validate_transaction(account, card, bill, transaction_type)
+    if not is_valid:
+        raise ValueError(error_message)
+
+    return account, card, bill, amount

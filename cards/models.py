@@ -18,8 +18,8 @@ class Card(models.Model):
     class CardType(models.TextChoices):
         DEBIT = "DE", "Debit"
         CREDIT = "CR", "Credit"
-        BENEFITS = "BF", "Both"
-        BOTH = "BO", "Benefits"
+        BENEFITS = "BF", "Benefits"
+        BOTH = "BO", "Both"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     brand = models.OneToOneField(
@@ -65,3 +65,7 @@ class Card(models.Model):
             self.save()
             return True
         return False
+
+    def make_paid_card(self):
+        self.available_limit = self.limit
+        self.save()

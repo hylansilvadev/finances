@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Categories, Bills, CreditCardBill
+from .models import Categories, Bills
 
 
 class CategoriesSerializer(serializers.HyperlinkedModelSerializer):
@@ -14,7 +14,3 @@ class BillsSerializer(serializers.HyperlinkedModelSerializer):
         model = Bills
         fields = '__all__'
 
-class CreditCardBillSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = CreditCardBill
-        fields = '__all__'
